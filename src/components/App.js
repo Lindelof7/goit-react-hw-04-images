@@ -1,4 +1,3 @@
-import { Component } from "react";
 import { Searchbar } from './Searchbar'
 import { ImageGallery } from './ImageGallery'
 import css from './App.module.css'
@@ -6,33 +5,26 @@ import { Modal } from "./Modal";
 import PropTypes from 'prop-types';
 import Notiflix from 'notiflix';
 import { Button } from './Button'
+import { useState, useEffect } from "react";
 
-export class App extends Component {
-  state = {
-    searchbar: '',
-    tags: '',
-    largeImageURL: '',
-    isModalOpen: false,
-    currentPage: 1,
-    galeryArr: [],
-    loading: false,
-    photosDiff: false,
-  }
-  componentDidUpdate(prevProps, prevState) {
-    if (prevState.searchbar !== this.state.searchbar || prevState.currentPage !== this.state.currentPage) {
-      this.setState({ loading: true })
-      this.fetchPhotos()
+export const App = () => {
+
+  const [searchbar, setSearchbar] = useState('');
+  const [tags, setTags] = useState('');
+  const [largeImageURL, setLargeImageURL] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [galeryArr, setGaleryArr] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [photosDiff, setPhotosDiff] = useState(false);
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    if (searchbar === '') {
+      return
     }
-  }
-
-
-  loadMore = () => {
-    this.setState(prevState => ({ currentPage: prevState.currentPage + 1 }));
-  };
-
-
-  fetchPhotos = () => {
-    fetch(`https://pixabay.com/api/?q=${this.state.searchbar}&page=${this.state.currentPage}&key=32358654-06404774fd2fdef00d453a3c4&image_type=photo&orientation=horizontal&per_page=12`)
+    setLoading(true);
+    fetch(`https://pixabay.com/api/?q=${searchbar}&page=${currentPage}&key=32358654-06404774fd2fdef00d453a3c4&image_type=photo&orientation=horizontal&per_page=12`)
       .then(response => {
         if (response.ok) { return (response.json()) }
         Promise.reject(new Error('Please provide valid search value'))
@@ -41,56 +33,54 @@ export class App extends Component {
       .then(({ hits, totalHits }) => {
         {
           if (hits.length < 1) {
-            Notiflix.Notify.failure('There is no photos with such attributes')
+            return Notiflix.Notify.failure('There is no photos with such attributes')
           }
           const totalPages = Math.ceil(totalHits / 12);
-          const pagesDiff = totalPages - this.state.currentPage
+          const pagesDiff = totalPages - currentPage
           if (pagesDiff > 0) {
-            this.setState({ photosDiff: true })
-          } else this.setState({ photosDiff: false })
+            setPhotosDiff(true)
+          } else setPhotosDiff(false)
         }
-        this.setState({ galeryArr: [...this.state.galeryArr, ...hits], })
+        setGaleryArr(prevGaleryArr => [...prevGaleryArr, ...hits])
       })
-      .catch(error => this.setState({ error }))
-      .finally(() => this.setState({ loading: false }))
-  }
+      .catch(error => setError(error.message))
+      .finally(() => setLoading(false))
+  }, [searchbar, currentPage]);
 
-  openModal = (largeImageURL, tags) => {
-    this.setState({ largeImageURL, tags });
+  const shouldLoadMoreBtnRender = galeryArr.length > 0 && !loading && photosDiff;
 
-    this.toggleModal();
+  const loadMore = () => {
+    setCurrentPage(prevCurrentPage => prevCurrentPage + 1);
   };
 
-  toggleModal = () => {
-    this.setState(({ isModalOpen }) => ({
-      isModalOpen: !isModalOpen,
-    }));
+  const openModal = (largeImageURL, tags) => {
+    setLargeImageURL(largeImageURL);
+    setTags(tags);
+    toggleModal();
   };
 
-  onSubmitForm = event => {
-    if (event !== this.state.searchbar) {
-      this.setState({
-        searchbar: event,
-        galeryArr: [],
-        currentPage: 1,
-      });
-    } else {
-      Notiflix.Notify.failure('The new search must be different from the current search');
+  const toggleModal = () => {
+    setIsModalOpen(!isModalOpen)
+  };
+
+  const onSubmitForm = event => {
+    if (event === searchbar) {
+      return Notiflix.Notify.failure('The new search must be different from the current search');
     }
+    console.log(event)
+    setSearchbar(event);
+    setCurrentPage(1);
+    setGaleryArr([])
   };
 
-  render() {
-
-    const { searchbar, isModalOpen, largeImageURL, tags, loading, galeryArr, photosDiff } = this.state;
-
-    return (
-      <div className={(css.App)} id='list'>
-        <Searchbar onSearch={this.onSubmitForm} />
-        <ImageGallery loading={loading} galeryArr={galeryArr} searchbar={searchbar} openModal={this.openModal} />
-        {isModalOpen && <Modal onClose={this.toggleModal} largeImageURL={largeImageURL} tags={tags} />}
-        {photosDiff && <Button className={css.loadMoreBtn} onClick={this.loadMore} />}
-      </div>)
-  };
+  return (
+    <div className={(css.App)} id='list'>
+      <Searchbar onSearch={onSubmitForm} />
+      <ImageGallery loading={loading} galeryArr={galeryArr} searchbar={searchbar} openModal={openModal} />
+      {error && <h1>Error occured</h1>}
+      {isModalOpen && <Modal onClose={toggleModal} largeImageURL={largeImageURL} tags={tags} />}
+      {shouldLoadMoreBtnRender && <Button className={css.loadMoreBtn} onClick={loadMore} />}
+    </div>)
 };
 
 App.propTypes = {
