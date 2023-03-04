@@ -1,4 +1,3 @@
-import { Component } from 'react'
 import css from './App.module.css'
 
 export const Button = ({ onClick }) => {
